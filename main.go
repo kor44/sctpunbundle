@@ -12,6 +12,8 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcapgo"
+
+	"github.com/kor44/pcapng"
 )
 
 type DeChunk struct {
@@ -38,6 +40,11 @@ func NewParser() *Parser {
 	p.DecodingLayerParser = gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet, &p.eth, &p.dot1q, &p.ip4, &p.ip6)
 	return &p
 
+}
+
+type packetReader interface {
+	LinkType() layers.LinkType
+	ReadPacketData() (data []byte, ci gopacket.CaptureInfo, err error)
 }
 
 func main() {
@@ -69,10 +76,15 @@ func main() {
 		os.Exit(1)
 	}
 	defer infile.Close()
-	r, err := pcapgo.NewReader(infile)
+
+	var r packetReader
+	r, err = pcapgo.NewReader(infile)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to read packets: %s", err)
-		os.Exit(1)
+		infile.Seek(0, 0)
+		if r, err = pcapng.NewReader(infile); err != nil {
+			fmt.Fprintf(os.Stderr, "Unable to read packets: %s", err)
+			os.Exit(1)
+		}
 	}
 
 	outfile, err := os.Create(fileNames[2])
